@@ -158,6 +158,25 @@ CORS_ALLOWED_ORIGINS = env.list(
 )
 CORS_ALLOW_CREDENTIALS = True
 
+# CORS Allowed Origin Regexes (supports deployed frontends on Vercel, Render, Netlify)
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://.*\.vercel\.app$",
+    r"^https://.*\.onrender\.com$",
+    r"^https://.*\.netlify\.app$",
+]
+
+# CSRF Trusted Origins for Django 4+ HTTPS requests
+CSRF_TRUSTED_ORIGINS = env.list(
+    'CSRF_TRUSTED_ORIGINS',
+    default=[
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
+        'https://*.onrender.com',
+        'https://*.vercel.app',
+        'https://*.netlify.app',
+    ]
+)
+
 # OpenAPI / Swagger Specification (drf-spectacular)
 SPECTACULAR_SETTINGS = {
     'TITLE': 'Humorphic Lab 3D Cybernetics Platform API',

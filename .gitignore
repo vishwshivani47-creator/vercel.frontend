@@ -6,6 +6,11 @@
 .env.production.local
 .env.*
 !.env.example
+!.env.production
+!.env.development
+!frontend/.env.example
+!frontend/.env.production
+!frontend/.env.development
 
 # Node / Frontend
 node_modules/

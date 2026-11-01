@@ -1,7 +1,50 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { authStorage } from './auth';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+/**
+ * Production Render Backend Base URL
+ */
+export const PRODUCTION_API_URL = 'https://humorphic-lab-backend.onrender.com/api/v1';
+
+/**
+ * Local Development Django Server Base URL
+ */
+export const LOCAL_API_URL = 'http://localhost:8000/api/v1';
+
+/**
+ * Centralized API Base URL resolution:
+ * 1. Honors NEXT_PUBLIC_API_URL environment variable if set.
+ * 2. In browser environments:
+ *    - Defaults to local development URL if accessed via localhost / 127.0.0.1.
+ *    - Defaults to production Render URL if accessed via any deployed/external host.
+ * 3. In server environments (SSR / build):
+ *    - Uses NEXT_PUBLIC_API_URL or defaults based on NODE_ENV.
+ */
+export const getApiBaseUrl = (): string => {
+  const envUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (envUrl && envUrl.trim() !== '') {
+    return envUrl.trim().replace(/\/+$/, '');
+  }
+
+  // Client-side host detection fallback
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0';
+    if (!isLocal) {
+      return PRODUCTION_API_URL;
+    }
+    return LOCAL_API_URL;
+  }
+
+  // Node server-side production build/runtime fallback
+  if (process.env.NODE_ENV === 'production') {
+    return PRODUCTION_API_URL;
+  }
+
+  return LOCAL_API_URL;
+};
+
+export const API_BASE_URL = getApiBaseUrl();
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -29,9 +72,13 @@ const processQueue = (error: AxiosError | null, token: string | null = null) => 
   failedQueue = [];
 };
 
-// Request Interceptor: Attach JWT Bearer Token
+// Request Interceptor: Ensure correct baseURL & attach JWT Bearer Token
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    // Dynamically guarantee baseURL is resolved from centralized configuration
+    if (!config.baseURL || config.baseURL === LOCAL_API_URL) {
+      config.baseURL = getApiBaseUrl();
+    }
     const token = authStorage.getAccessToken();
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -76,7 +123,8 @@ apiClient.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const { data } = await axios.post(`${API_BASE_URL}/auth/refresh/`, {
+        const baseUrl = getApiBaseUrl();
+        const { data } = await axios.post(`${baseUrl}/auth/refresh/`, {
           refresh: refreshToken,
         });
 

@@ -14,7 +14,7 @@ DATABASES = {
 
 # If PostgreSQL connection cannot be made in local standalone dev, fallback to sqlite
 import sys
-if 'manage.py' in sys.argv[0] and env('POSTGRES_HOST', default='') == '':
+if not os.environ.get('DATABASE_URL') and env('POSTGRES_HOST', default='') in ('', 'localhost', '127.0.0.1'):
     DATABASES['default'] = {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
