@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { authService } from '@/services/auth.service';
+import { extractApiErrorMessage } from '@/lib/api';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -55,10 +56,11 @@ export default function RegisterPage() {
       await authService.register(values);
       router.push('/dashboard');
     } catch (err: any) {
-      setServerError(
-        err.response?.data?.message ||
-          'Failed to register account. Please check the values and try again.'
+      const msg = extractApiErrorMessage(
+        err,
+        'Failed to register account. Please check the values and try again.'
       );
+      setServerError(msg);
     } finally {
       setIsLoading(false);
     }

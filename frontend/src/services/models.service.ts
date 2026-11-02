@@ -1,4 +1,4 @@
-import { apiClient } from '@/lib/api';
+import { apiClient, API_ENDPOINTS } from '@/lib/api';
 import { Model3D, Category, PaginatedResponse } from '@/types/models3d.types';
 
 export const modelsService = {
@@ -9,31 +9,31 @@ export const modelsService = {
     featured?: boolean;
     format?: string;
   }): Promise<PaginatedResponse<Model3D>> {
-    const { data } = await apiClient.get<PaginatedResponse<Model3D>>('/3d-models/', {
+    const { data } = await apiClient.get<PaginatedResponse<Model3D>>(API_ENDPOINTS.MODELS, {
       params,
     });
     return data;
   },
 
   async getModelById(id: string): Promise<Model3D> {
-    const { data } = await apiClient.get<Model3D>(`/3d-models/${id}/`);
+    const { data } = await apiClient.get<Model3D>(`${API_ENDPOINTS.MODELS}${id}/`);
     return data;
   },
 
   async getMyModels(page = 1): Promise<PaginatedResponse<Model3D>> {
-    const { data } = await apiClient.get<PaginatedResponse<Model3D>>('/3d-models/my_models/', {
+    const { data } = await apiClient.get<PaginatedResponse<Model3D>>(`${API_ENDPOINTS.MODELS}my_models/`, {
       params: { page },
     });
     return data;
   },
 
   async getCategories(): Promise<PaginatedResponse<Category>> {
-    const { data } = await apiClient.get<PaginatedResponse<Category>>('/3d-models/categories/');
+    const { data } = await apiClient.get<PaginatedResponse<Category>>(`${API_ENDPOINTS.MODELS}categories/`);
     return data;
   },
 
   async uploadModel(formData: FormData): Promise<Model3D> {
-    const { data } = await apiClient.post<Model3D>('/3d-models/', formData, {
+    const { data } = await apiClient.post<Model3D>(API_ENDPOINTS.MODELS, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -42,6 +42,6 @@ export const modelsService = {
   },
 
   async deleteModel(id: string): Promise<void> {
-    await apiClient.delete(`/3d-models/${id}/`);
+    await apiClient.delete(`${API_ENDPOINTS.MODELS}${id}/`);
   },
 };

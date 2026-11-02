@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState } from 'react';
@@ -31,7 +32,7 @@ export default function HomePage() {
 
   return (
     <div className="relative w-full overflow-hidden bg-cyber-bg">
-      
+
       {/* OPENING INTRO: FUTURISTIC GRADIENT ASCII EXPERIENCE */}
       <GradientAsciiIntro />
 

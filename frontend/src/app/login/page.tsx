@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { authService } from '@/services/auth.service';
+import { extractApiErrorMessage } from '@/lib/api';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -41,10 +42,11 @@ export default function LoginPage() {
       await authService.login(values);
       router.push('/dashboard');
     } catch (err: any) {
-      setServerError(
-        err.response?.data?.message ||
-          'Invalid credentials provided. Please check your username and password.'
+      const msg = extractApiErrorMessage(
+        err,
+        'Invalid credentials provided. Please check your username and password.'
       );
+      setServerError(msg);
     } finally {
       setIsLoading(false);
     }
