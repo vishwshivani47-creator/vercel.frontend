@@ -2,38 +2,38 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { authStorage } from './auth';
 
 /**
- * Verified Production Render Backend Base URL
+ * Verified Production Render Backend Base URL (Versioned API)
  * Swagger docs: https://humorphic-lab-backend.onrender.com
  */
-export const PRODUCTION_API_URL = 'https://humorphic-lab-backend.onrender.com';
+export const PRODUCTION_API_URL = 'https://humorphic-lab-backend.onrender.com/api/v1';
 
 /**
- * Local Development Django Server Base URL
+ * Local Development Django Server Base URL (Versioned API)
  */
-export const LOCAL_API_URL = 'http://localhost:8000';
+export const LOCAL_API_URL = 'http://localhost:8000/api/v1';
 
 /**
- * Verified Backend API Endpoints (Swagger-compatible versioned paths)
+ * Verified Backend API Endpoints (relative to /api/v1)
  */
 export const API_ENDPOINTS = {
-  HEALTH: '/api/v1/health/',
-  LOGIN: '/api/v1/auth/login/',
-  REGISTER: '/api/v1/auth/register/',
-  LOGOUT: '/api/v1/auth/logout/',
-  ME: '/api/v1/auth/me/',
-  REFRESH: '/api/v1/auth/refresh/',
-  MODELS: '/api/v1/3d-models/',
-  USERS: '/api/v1/users/',
-  PRODUCTS: '/api/v1/products/',
+  HEALTH: '/health/',
+  LOGIN: '/auth/login/',
+  REGISTER: '/auth/register/',
+  LOGOUT: '/auth/logout/',
+  ME: '/auth/me/',
+  REFRESH: '/auth/refresh/',
+  MODELS: '/3d-models/',
+  USERS: '/users/',
+  PRODUCTS: '/products/',
 } as const;
 
 /**
- * Extracts and formats meaningful validation error messages from backend responses.
- * Handles response.data.details dictionaries containing field arrays:
- * - Username already exists.
- * - Email already exists.
- * - Password is too common.
- * - Password confirmation mismatch.
+ * Extracts and formats meaningful validation and system error messages from backend responses.
+ * Handles:
+ * - 500 Internal Server Errors (prevents raw stack traces)
+ * - 502/503/504 Cold starts & Service Unavailable
+ * - 401 Authentication & credential failures
+ * - 400 Field-level serializer validation (Username/Email collision, weak password, etc.)
  */
 export function extractApiErrorMessage(err: any, fallbackMessage: string): string {
   if (!err) return fallbackMessage;
@@ -43,8 +43,30 @@ export function extractApiErrorMessage(err: any, fallbackMessage: string): strin
     return 'Unable to connect to the backend server. The production server may be waking up from sleep or experiencing network delay. Please try again.';
   }
 
+  const status = err.response?.status;
   const responseData = err.response?.data;
-  if (!responseData) {
+
+  // 502 / 503 / 504 Gateway / Service Unavailable
+  if (status === 502 || status === 503 || status === 504) {
+    return 'The backend service is temporarily waking up or unavailable. Please wait a moment and try again.';
+  }
+
+  // 500 Internal Server Error
+  if (status === 500 || (responseData && typeof responseData === 'object' && responseData.status_code === 500)) {
+    return 'The backend server encountered an internal error. Please try again in a few moments.';
+  }
+
+  // 401 Unauthorized / Invalid Credentials
+  if (status === 401) {
+    if (responseData && typeof responseData === 'object' && responseData.message) {
+      if (!responseData.message.includes('error occurred during request processing')) {
+        return responseData.message;
+      }
+    }
+    return 'Invalid credentials provided. Please check your username and password.';
+  }
+
+  if (!responseData || typeof responseData !== 'object') {
     return err.message || fallbackMessage;
   }
 
@@ -73,13 +95,19 @@ export function extractApiErrorMessage(err: any, fallbackMessage: string): strin
           messages.push(lower.includes('already exists') ? 'Email already exists.' : `Email: ${rawMsg}`);
         } else if (field === 'password_confirm') {
           messages.push(lower.includes('match') ? 'Password confirmation mismatch.' : `Password confirmation: ${rawMsg}`);
-        } else if (field === 'non_field_errors') {
-          messages.push(lower.includes('too common') ? 'Password is too common.' : rawMsg);
-        } else if (field === 'password') {
-          messages.push(lower.includes('too common') ? 'Password is too common.' : `Password: ${rawMsg}`);
+        } else if (field === 'non_field_errors' || field === 'password') {
+          if (lower.includes('too common')) {
+            messages.push('Password is too common.');
+          } else if (lower.includes('too short')) {
+            messages.push('Password must be at least 8 characters.');
+          } else if (lower.includes('entirely numeric')) {
+            messages.push('Password cannot be entirely numeric.');
+          } else {
+            messages.push(rawMsg);
+          }
         } else {
           const formattedField = field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-          messages.push(`${formattedField}: ${rawMsg}`);
+          messages.push(rawMsg.startsWith(formattedField) ? rawMsg : `${formattedField}: ${rawMsg}`);
         }
       }
     }
@@ -105,18 +133,17 @@ export function extractApiErrorMessage(err: any, fallbackMessage: string): strin
 /**
  * Centralized API Base URL resolution:
  * 1. Honors NEXT_PUBLIC_API_URL environment variable if set.
- *    Strips any trailing '/api/v1' or slashes because all endpoints explicitly include versioned paths.
- * 2. In browser environments:
- *    - Defaults to local development URL if accessed via localhost / 127.0.0.1.
- *    - Defaults to production Render URL if accessed via any deployed host (Vercel, Render, etc.).
- * 3. In server environments (SSR / build):
- *    - Uses NEXT_PUBLIC_API_URL or defaults based on NODE_ENV.
+ *    Guarantees it ends with '/api/v1'.
+ * 2. Defaults to PRODUCTION_API_URL ('https://humorphic-lab-backend.onrender.com/api/v1')
  */
 export const getApiBaseUrl = (): string => {
   const envUrl = process.env.NEXT_PUBLIC_API_URL;
   if (envUrl && envUrl.trim() !== '') {
-    // Strip trailing slashes and redundant '/api/v1' if user provided it in env
-    return envUrl.trim().replace(/\/+$/, '').replace(/\/api\/v1\/?$/, '');
+    let clean = envUrl.trim().replace(/\/+$/, '');
+    if (!clean.endsWith('/api/v1')) {
+      clean += '/api/v1';
+    }
+    return clean;
   }
 
   // Client-side host detection fallback
@@ -126,15 +153,12 @@ export const getApiBaseUrl = (): string => {
     if (!isLocal) {
       return PRODUCTION_API_URL;
     }
-    return LOCAL_API_URL;
-  }
-
-  // Node server-side production build/runtime fallback
-  if (process.env.NODE_ENV === 'production') {
+    // Default to production Render backend even locally if no local Django server is configured
     return PRODUCTION_API_URL;
   }
 
-  return LOCAL_API_URL;
+  // Node server-side build/runtime fallback
+  return PRODUCTION_API_URL;
 };
 
 export const API_BASE_URL = getApiBaseUrl();
@@ -165,20 +189,23 @@ const processQueue = (error: AxiosError | null, token: string | null = null) => 
   failedQueue = [];
 };
 
-// Request Interceptor: Ensure correct baseURL, ensure /api/v1 prefix & attach JWT Bearer Token
+// Request Interceptor: Ensure correct baseURL with /api/v1 & attach JWT Bearer Token
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     // Dynamically guarantee baseURL is resolved from centralized configuration
-    config.baseURL = getApiBaseUrl();
+    let base = getApiBaseUrl().replace(/\/+$/, '');
+    if (!base.endsWith('/api/v1')) {
+      base += '/api/v1';
+    }
+    config.baseURL = base;
 
-    // Ensure endpoint URL starts with /api/v1 to prevent any 404 from unversioned paths (e.g. /auth/register/)
+    // Normalize relative path so it never duplicates /api/v1/api/v1/
     if (config.url && !config.url.startsWith('http')) {
       let path = config.url.startsWith('/') ? config.url : `/${config.url}`;
-      if (!path.startsWith('/api/v1/')) {
-        path = `/api/v1${path}`;
+      if (path.startsWith('/api/v1/')) {
+        path = path.slice(7); // strip redundant '/api/v1' prefix
       }
-      // Deduplicate accidental double prefixes like /api/v1/api/v1/
-      config.url = path.replace(/^\/api\/v1\/api\/v1\//, '/api/v1/');
+      config.url = path;
     }
 
     const token = authStorage.getAccessToken();
@@ -225,8 +252,11 @@ apiClient.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const baseUrl = getApiBaseUrl();
-        const refreshEndpoint = `${baseUrl}/api/v1/auth/refresh/`;
+        let baseUrl = getApiBaseUrl().replace(/\/+$/, '');
+        if (!baseUrl.endsWith('/api/v1')) {
+          baseUrl += '/api/v1';
+        }
+        const refreshEndpoint = `${baseUrl}/auth/refresh/`;
         const { data } = await axios.post(refreshEndpoint, {
           refresh: refreshToken,
         });

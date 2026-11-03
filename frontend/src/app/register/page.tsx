@@ -54,7 +54,7 @@ export default function RegisterPage() {
     setServerError(null);
     try {
       await authService.register(values);
-      router.push('/dashboard');
+      router.push('/');
     } catch (err: any) {
       const msg = extractApiErrorMessage(
         err,
@@ -176,6 +176,7 @@ export default function RegisterPage() {
               size="lg"
               className="w-full mt-2"
               isLoading={isLoading}
+              disabled={isLoading}
               rightIcon={<ArrowRight className="h-4 w-4" />}
             >
               REGISTER CREDENTIALS

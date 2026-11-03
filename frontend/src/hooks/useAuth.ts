@@ -1,14 +1,27 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { usePathname } from 'next/navigation';
 import { User } from '@/types/auth.types';
-import { authStorage } from '@/lib/auth';
+import { authStorage, AUTH_CHANGE_EVENT } from '@/lib/auth';
 import { authService } from '@/services/auth.service';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const pathname = usePathname();
+
+  const syncFromStorage = useCallback(() => {
+    const isAuthed = authStorage.isAuthenticated();
+    setIsAuthenticated(isAuthed);
+    if (isAuthed) {
+      const cached = authStorage.getUser();
+      setUser(cached);
+    } else {
+      setUser(null);
+    }
+  }, []);
 
   const refreshUser = useCallback(async () => {
     if (!authStorage.isAuthenticated()) {
@@ -19,41 +32,61 @@ export function useAuth() {
     }
 
     try {
-      const cached = authStorage.getUser();
-      if (cached) {
-        setUser(cached);
-        setIsAuthenticated(true);
-      }
+      syncFromStorage();
       const fresh = await authService.getMe();
       setUser(fresh);
+      authStorage.setUser(fresh);
       setIsAuthenticated(true);
     } catch {
-      authStorage.clearTokens();
-      setUser(null);
-      setIsAuthenticated(false);
+      // If getMe fails because token is invalid/expired and cannot be refreshed
+      if (!authStorage.isAuthenticated()) {
+        setUser(null);
+        setIsAuthenticated(false);
+      }
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [syncFromStorage]);
 
   useEffect(() => {
+    // Initial sync
+    syncFromStorage();
     refreshUser();
 
+    const handleAuthChange = () => {
+      syncFromStorage();
+    };
+
     const handleAuthExpired = () => {
+      authStorage.clearTokens();
       setUser(null);
       setIsAuthenticated(false);
     };
 
+    window.addEventListener(AUTH_CHANGE_EVENT, handleAuthChange);
+    window.addEventListener('storage', handleAuthChange);
     window.addEventListener('humorphic-auth-expired', handleAuthExpired);
+
     return () => {
+      window.removeEventListener(AUTH_CHANGE_EVENT, handleAuthChange);
+      window.removeEventListener('storage', handleAuthChange);
       window.removeEventListener('humorphic-auth-expired', handleAuthExpired);
     };
-  }, [refreshUser]);
+  }, [syncFromStorage, refreshUser]);
+
+  // Sync state whenever route/pathname changes
+  useEffect(() => {
+    syncFromStorage();
+  }, [pathname, syncFromStorage]);
 
   const logout = async () => {
-    await authService.logout();
-    setUser(null);
-    setIsAuthenticated(false);
+    try {
+      await authService.logout();
+    } finally {
+      authStorage.clearTokens();
+      setUser(null);
+      setIsAuthenticated(false);
+    }
   };
 
   return {

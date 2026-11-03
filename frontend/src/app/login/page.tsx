@@ -40,7 +40,7 @@ export default function LoginPage() {
     setServerError(null);
     try {
       await authService.login(values);
-      router.push('/dashboard');
+      router.push('/');
     } catch (err: any) {
       const msg = extractApiErrorMessage(
         err,
@@ -110,6 +110,7 @@ export default function LoginPage() {
               size="lg"
               className="w-full mt-2"
               isLoading={isLoading}
+              disabled={isLoading}
               rightIcon={<ArrowRight className="h-4 w-4" />}
             >
               INITIALIZE SESSION

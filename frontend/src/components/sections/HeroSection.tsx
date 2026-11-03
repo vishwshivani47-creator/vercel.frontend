@@ -5,6 +5,7 @@ import { SITE_CONFIG } from '@/config/site';
 import { Button } from '@/components/ui/Button';
 import { Bot, Users, Activity, Compass, Cpu, ChevronDown } from 'lucide-react';
 import { HeroRobot } from '@/components/3d/HeroRobot';
+import { useAuth } from '@/hooks/useAuth';
 
 export interface HeroSectionProps {
   onExploreRobot?: () => void;
@@ -21,6 +22,7 @@ export function HeroSection({
   onSelectPart,
   modelUrl,
 }: HeroSectionProps) {
+  const { user, isAuthenticated } = useAuth();
   const fullText = SITE_CONFIG.description;
   const [displayedText, setDisplayedText] = useState('');
   const [scrollY, setScrollY] = useState(0);
@@ -89,9 +91,20 @@ export function HeroSection({
         <div className="pointer-events-auto inline-flex items-center gap-2.5 rounded-full border border-[#97D7FF]/50 bg-cyber-bg/85 px-4 py-1.5 backdrop-blur-xl shadow-glow-sky">
           <Activity className="h-4 w-4 text-[#97D7FF] animate-pulse" />
           <span className="text-xs font-mono font-medium tracking-wider text-slate-200">
-            <span className="text-[#97D7FF] font-bold">ROBOTICS</span> • <span className="text-[#FFEFC4] font-bold">AI</span> • INNOVATION
-            <span className="text-slate-500 mx-2">//</span>
-            <span className="text-emerald-400 font-bold">[SEC_SYS::ACTV]</span>
+            {isAuthenticated ? (
+              <>
+                <span className="text-[#97D7FF] font-bold">PILOT ONLINE:</span>{' '}
+                <span className="text-[#FFEFC4] font-bold">{user?.username}</span>
+                <span className="text-slate-500 mx-2">//</span>
+                <span className="text-emerald-400 font-bold">[{user?.role?.toUpperCase() || 'ENGINEER'}]</span>
+              </>
+            ) : (
+              <>
+                <span className="text-[#97D7FF] font-bold">ROBOTICS</span> • <span className="text-[#FFEFC4] font-bold">AI</span> • INNOVATION
+                <span className="text-slate-500 mx-2">//</span>
+                <span className="text-emerald-400 font-bold">[SEC_SYS::ACTV]</span>
+              </>
+            )}
           </span>
         </div>
 

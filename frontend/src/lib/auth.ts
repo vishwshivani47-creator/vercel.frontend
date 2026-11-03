@@ -4,6 +4,14 @@ const ACCESS_TOKEN_KEY = 'humorphic_access_token';
 const REFRESH_TOKEN_KEY = 'humorphic_refresh_token';
 const USER_KEY = 'humorphic_user';
 
+export const AUTH_CHANGE_EVENT = 'humorphic-auth-change';
+
+const notifyAuthChange = () => {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(AUTH_CHANGE_EVENT));
+  }
+};
+
 export const authStorage = {
   getAccessToken: (): string | null => {
     if (typeof window === 'undefined') return null;
@@ -19,6 +27,7 @@ export const authStorage = {
     if (typeof window === 'undefined') return;
     localStorage.setItem(ACCESS_TOKEN_KEY, access);
     localStorage.setItem(REFRESH_TOKEN_KEY, refresh);
+    notifyAuthChange();
   },
 
   clearTokens: (): void => {
@@ -26,6 +35,7 @@ export const authStorage = {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+    notifyAuthChange();
   },
 
   getUser: (): User | null => {
@@ -42,6 +52,7 @@ export const authStorage = {
   setUser: (user: User): void => {
     if (typeof window === 'undefined') return;
     localStorage.setItem(USER_KEY, JSON.stringify(user));
+    notifyAuthChange();
   },
 
   isAuthenticated: (): boolean => {
